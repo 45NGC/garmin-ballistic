@@ -1,0 +1,6 @@
+<strings>
+    <string id="AppName">Visor de sensores</string>
+    <string id="UnitSetting">Unidades</string>
+    <string id="Metric">Métricas (m, m/s, °C, hPa)</string>
+    <string id="Imperial">Imperiales (yd, mph, °F, inHg)</string>
+</strings>

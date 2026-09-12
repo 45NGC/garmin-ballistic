@@ -1,0 +1,8 @@
+<settings>
+    <setting propertyKey="@Properties.UnitSystem" title="@Strings.UnitSetting">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.Metric</listEntry>
+            <listEntry value="1">@Strings.Imperial</listEntry>
+        </settingConfig>
+    </setting>
+</settings>
