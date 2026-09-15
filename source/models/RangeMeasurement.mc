@@ -1,6 +1,6 @@
 import Toybox.Lang;
 
-// Phase 1 subset. Timestamp is the WATCH reception time (Unix seconds).
+// Sensor measurement. Timestamp is the WATCH reception time (Unix seconds).
 // receivedAtMs is session-only monotonic time; never persist it across launches.
 class RangeMeasurement {
     var timestamp as Number;

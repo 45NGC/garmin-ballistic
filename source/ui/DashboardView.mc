@@ -30,7 +30,7 @@ class DashboardView extends WatchUi.View {
         dc.clear();
         // Proportional safe areas accommodate round screens. Fonts are measured
         // against both width and height; no absolute device pixel coordinates.
-        text(dc, w / 2, h * 0.09, "DEMO · DISTANCIA", w * 0.55, h * 0.07, false);
+        text(dc, w / 2, h * 0.09, _controller.history.hasWarning() ? "DEMO · ERROR REG." : "DEMO · DISTANCIA", w * 0.62, h * 0.07, false);
         text(dc, w / 2, h * 0.235, DisplayUnits.distance(range, imperial), w * 0.80, h * 0.22, true);
         text(dc, w / 2, h * 0.35, imperial ? "yd" : "m", w * 0.25, h * 0.065, false);
         text(dc, w / 2, h * 0.405, DisplayUnits.time(range) + "  " + rangeStatus, w * 0.88, h * 0.07, false);

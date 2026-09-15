@@ -1,90 +1,98 @@
 # Arquitectura y fases
 
-## Estructura inicial
-
 ```text
-manifest.xml                 watch-app; objetivo fenix7x; sin permisos de radio
-monkey.jungle                fuentes, tests y recursos
-resources/                   icono, cadenas y ajuste de unidades
 source/
-  SensorViewerApp.mc          composición y ciclo de vida de la aplicación
-  config/AppConfig.mc        unidades, cadencia demo, umbrales de antigüedad
-  controllers/               coordinación de la demo y recepción de muestras
-  ui/                        vistas, menú y conversiones de presentación
-  models/                    muestras de distancia, meteo y antigüedad
-  providers/                 contratos base con entrega por callbacks
-    mock/                    fixtures deterministas, sin transporte
-    terrapin/                reservado para adaptador real de Fase 4
-    kestrel/                 reservado para adaptador real de Fase 5
+  SensorViewerApp.mc          composición y ciclo de vida
+  config/AppConfig.mc        unidades, intervalos, antigüedad, límite del historial
+  controllers/               recepción de muestras y guardado por evento de distancia
+  ui/                        visor, historial, detalle, confirmación y conversiones
+  models/                    RangeMeasurement, EnvironmentalMeasurement,
+                             MeasurementRecord y Freshness
+  providers/                 contratos base con callbacks
+    mock/                    fixtures deterministas
+    terrapin/                reservado para Fase 4
+    kestrel/                 reservado para Fase 5
   parsers/                   reservado para protocolos documentados
-  storage/                   reservado para historial persistente
-tests/                       pruebas Monkey C
-docs/                        investigación, diseño y verificación
+  storage/                   RecordCodec, MeasurementRepository, HistoryStore
+tests/                      pruebas Monkey C de la demo y el historial
 ```
 
-`AppBase` construye el controlador; la vista dibuja el estado y activa/desactiva
-la demo al mostrarse/ocultarse. Los proveedores entregan objetos nuevos mediante
-callbacks. Solo los mocks necesitan `pump()`, dirigido por un temporizador del
-controlador; los proveedores reales serán dirigidos por eventos del transporte.
-`RangefinderProvider` y `WeatherProvider` son clases base con contratos comunes.
-Monkey Types también permite interfaces estructurales; no se usa la sintaxis
-`interface ... implements ...` de Java.
+`AppBase` construye el controlador. El visor activa/desactiva los mocks al
+mostrarse/ocultarse. Cada proveedor entrega objetos nuevos mediante callbacks;
+solo los mocks utilizan `pump()`, llamado por el temporizador del controlador.
+Los proveedores reales usarán eventos del transporte.
 
-Las clases actuales de medición son el subconjunto necesario para la demo; los
-campos opcionales usan `null`. `timestamp` significa recepción en el reloj, no
-hora de captura garantizada por el sensor. `receivedAtMs` solo sirve para medir
-antigüedad dentro de la sesión. Las conversiones no modifican el modelo original.
+Un evento de distancia llega a `DemoController.onRange()`, que captura el último
+ambiente con `RecordCodec.capture()` y solicita su persistencia al repositorio.
+No se guarda por redibujado, conversión de unidades ni evento meteorológico.
+Los menús, el historial y sus detalles detienen la adquisición simulada igual
+que los menús de Fase 1; las conexiones en segundo plano quedan fuera del alcance.
 
-## Plan incremental
+## Modelos y persistencia
 
-1. **Fase 1, implementada:** visor simulado, distancia/hora, viento/dirección,
-   temperatura/presión, ajuste de unidades, desconexión simulada independiente
-   y avisos de antigüedad. Todo el estado de mediciones es temporal.
-2. **Fase 2, pendiente:** completar modelos, `MeasurementRecord`, captura del
-   ambiente al recibir distancia, repositorio local acotado, vista de historial,
-   detalle y borrado desde menú.
-3. **Fase 3, pendiente:** consolidar los contratos iniciales, inyectar proveedores,
-   añadir estados buscando/conectando/conectado/desconectado/error, eventos de
-   estado y escenarios de datos ausentes/parciales. Evitar dependencias del
-   controlador de producción con las clases mock.
-4. **Fase 4, condicionada:** `TerrapinRangefinderProvider` y parser, únicamente con
-   especificación accesible. Investigación inicial en `comunicaciones.md`.
-5. **Fase 5, condicionada:** `KestrelWeatherProvider` y parser meteorológico LiNK,
-   únicamente con especificación autorizada.
-6. **Fase 6, pendiente:** validación física exterior y múltiples resoluciones,
-   reconexión con espera progresiva y escaneos acotados, actualización por cambios,
-   medición de consumo y manejo de suspensión. Sin prometer recepción continua
-   con la app cerrada o en segundo plano.
+`RangeMeasurement` y `EnvironmentalMeasurement` contienen las muestras recibidas.
+`timestamp` es recepción en el reloj en segundos Unix, no una hora de captura
+que proporcione necesariamente el sensor. `receivedAtMs` mide antigüedad dentro
+de la sesión. Los campos opcionales son `null`; no se sustituyen por cero.
 
-## Diseño del registro para Fase 2
+`MeasurementRecord` contiene una copia de escalares sin setters; sus accesores
+devuelven copias. Las actualizaciones de los proveedores y las conversiones de
+presentación no pueden modificarlo. Las clases de muestra reconstruidas para
+presentación tienen ticks cero; no se utilizan para recalcular antigüedad.
 
-Un evento válido de distancia creará un `MeasurementRecord` nuevo, incluso si
-coincide numéricamente con el anterior. No crear registros al repintar ni al
-actualizar solo la meteorología. Si el protocolo permite retransmisiones,
-deduplicar por su identificador/secuencia documentado, no por distancia.
+Formato persistido bajo `measurementHistory`:
 
-Campos del registro serializado (diseño, todavía no implementado):
+```text
+{ schemaVersion: 1, records: [ registroMásReciente, ..., registroMásAntiguo ] }
+```
 
-| Campo | Significado |
+| Campo de cada registro | Significado |
 | --- | --- |
-| schemaVersion | Versión del formato persistente |
-| timestamp | Recepción de la distancia en el reloj, Unix segundos |
-| distance / unit | Distancia original y unidad m/yd |
-| azimuth / inclination | Valores proporcionados o null, grados |
+| timestamp | Recepción de distancia, Unix segundos |
+| distance / unit | Valor original y unidad m/yd |
+| azimuth / inclination | Grados proporcionados, o null |
 | windSpeed / windDirection | m/s y grados, o null |
-| temperature / pressure / humidity | °C, hPa y % HR, o null |
-| environmentalTimestamp | Recepción de la muestra ambiental, o null |
-| environmentalAgeSeconds | Antigüedad de esa muestra al medir |
-| environmentalStale / environmentalConnected | Calidad y estado al medir |
-| rangeSource / weatherSource / simulated | Procedencia, incluida la demo |
+| temperature / pressure / humidity | °C, hPa de estación y % HR, o null |
+| environmentalTimestamp | Recepción de ambiente, o null |
+| environmentalAgeSeconds | Antigüedad al medir; null si desconocida |
+| environmentalStale / environmentalConnected | Estado al medir |
+| rangeSource / weatherSource / simulated | Procedencia y marca de datos simulados |
 
-Copiar los valores del último ambiente recibido en ese instante. Los cambios
-meteorológicos posteriores no deben modificar registros anteriores. Si falta
-meteo, guardar la distancia con campos ambientales `null`; si está desactualizada,
-conservarla con su fecha y marca de antigüedad. Preservar también la semántica de
-presión y referencia de dirección cuando se incorporen protocolos reales.
+Si falta ambiente, se guarda la distancia con campos meteo `null`. Si está antiguo
+o desconectado, se conserva con su estado. Un salto del reloj de sesión produce
+edad desconocida y marca de antigüedad; cambiar la hora civil no modifica los
+ticks. La versión actual captura procedencias de mocks. Los adaptadores futuros
+deberán aportar identidad, semántica de presión y referencia angular verificadas.
 
-Usar `Application.Storage`, serialización explícita y límites de memoria; no
-serializar directamente instancias de clases. La capacidad se elegirá tras
-medir el tamaño real de cada registro en el reloj. Documentación oficial:
+`RecordCodec.decode()` valida campos obligatorios, tipos, unidad, valores finitos
+y consistencia de ausencia de ambiente. Los límites numéricos amplios no son
+especificaciones de precisión ni rangos operativos de ningún dispositivo.
+El envoltorio valida la versión y el máximo de 20 registros.
+
+El repositorio sustituye su lista en memoria solo tras guardar correctamente.
+Un error de escritura deja disponible el visor y conserva los registros previos;
+la medición fallida no se encola. El contador de pérdidas es de sesión y permanece
+aunque una escritura posterior funcione. Datos dañados o versiones desconocidas
+bloquean escrituras automáticas hasta recuperación en un reinicio o borrado
+explícito. No se borran las preferencias de unidades.
+
+El adaptador `HistoryStore` permite pruebas con fallos de lectura/escritura
+inyectados sin tocar el historial real. Hay también un test con `Application.Storage`
+bajo una clave independiente. Referencia oficial:
 [Storage](https://developer.garmin.com/connect-iq/api-docs/Toybox/Application/Storage.html).
+
+## Fases
+
+1. **Fase 1 implementada:** visor, unidades y mocks, estados y antigüedad.
+2. **Fase 2 implementada:** snapshots de mediciones y ambiente, persistencia de
+   últimas 20 mediciones, navegación, detalle, borrado confirmado y errores.
+   Compilación genérica verificada; ejecución y validación visual pendientes.
+3. **Fase 3 pendiente:** consolidar contratos, inyección de proveedores y estados
+   de transporte. Retirar dependencias de mocks del controlador de producción.
+4. **Fase 4 condicionada:** Terrapin real y parser con protocolo accesible.
+5. **Fase 5 condicionada:** Kestrel LiNK real y parser meteorológico autorizado.
+6. **Fase 6 pendiente:** validación exterior, otras resoluciones, reconexión y
+   consumo medido con dispositivos físicos.
+
+Todas las fases reciben, presentan y registran sensores; no incluyen cálculos
+balísticos. Investigación y requisitos: [comunicaciones](comunicaciones.md).

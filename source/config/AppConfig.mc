@@ -9,6 +9,8 @@ module AppConfig {
     const WEATHER_INTERVAL_MS = 4000;
     const RANGE_STALE_MS = 30000;
     const WEATHER_STALE_MS = 15000;
+    // Conservative cap: one versioned Storage value, below its 32 KB limit.
+    const HISTORY_LIMIT = 20;
 
     function isImperial() as Boolean {
         var units = Application.Properties.getValue("UnitSystem");

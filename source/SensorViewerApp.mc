@@ -8,7 +8,7 @@ class SensorViewerApp extends Application.AppBase {
 
     function initialize() {
         AppBase.initialize();
-        _controller = new DemoController();
+        _controller = new DemoController(null);
     }
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {

@@ -41,4 +41,10 @@ module DisplayUnits {
         var info = Gregorian.info(new Time.Moment(value.timestamp), Time.FORMAT_SHORT);
         return info.hour.format("%02d") + ":" + info.min.format("%02d") + ":" + info.sec.format("%02d");
     }
+
+    function timestamp(at as Number) as String {
+        var info = Gregorian.info(new Time.Moment(at), Time.FORMAT_SHORT);
+        return info.day.format("%02d") + "/" + (info.month as Number).format("%02d") + "/" + info.year.format("%04d") + " " +
+            info.hour.format("%02d") + ":" + info.min.format("%02d") + ":" + info.sec.format("%02d");
+    }
 }

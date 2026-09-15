@@ -16,6 +16,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
 
     function onMenu() as Boolean {
         var menu = new WatchUi.Menu2({:title => "Demo de sensores"});
+        menu.addItem(new WatchUi.MenuItem("Historial", "Últimas " + AppConfig.HISTORY_LIMIT.toString() + " mediciones", :history, null));
         menu.addItem(new WatchUi.MenuItem("Cambiar unidades", AppConfig.isImperial() ? "Ahora: imperiales" : "Ahora: métricas", :units, null));
         menu.addItem(new WatchUi.MenuItem("Telémetro simulado", "Conectar / desconectar", :rangeConnection, null));
         menu.addItem(new WatchUi.MenuItem("Meteo simulada", "Conectar / desconectar", :weatherConnection, null));
@@ -34,7 +35,11 @@ class DemoMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
-        if (id == :units) {
+        if (id == :history) {
+            var view = new HistoryView(_controller.history);
+            WatchUi.pushView(view, new HistoryDelegate(view, _controller.history), WatchUi.SLIDE_UP);
+            return;
+        } else if (id == :units) {
             AppConfig.toggleUnits();
         } else if (id == :rangeConnection) {
             _controller.rangefinder.toggleConnection();

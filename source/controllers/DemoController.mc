@@ -4,18 +4,20 @@ import Toybox.Time;
 import Toybox.Timer;
 import Toybox.WatchUi;
 
-// Explicitly a demo composition. No BLE calls, parsing, or storage in Phase 1.
+// Demo acquisition with production local history. No sensor protocol or BLE.
 class DemoController {
     var range as RangeMeasurement or Null = null;
     var weather as EnvironmentalMeasurement or Null = null;
     var rangefinder as MockRangefinderProvider;
     var weatherProvider as MockWeatherProvider;
+    var history as MeasurementRepository;
     private var _timer as Timer.Timer;
     private var _running as Boolean = false;
 
-    function initialize() {
+    function initialize(store as HistoryStore or Null) {
         rangefinder = new MockRangefinderProvider();
         weatherProvider = new MockWeatherProvider();
+        history = new MeasurementRepository(store == null ? new HistoryStore() : store);
         _timer = new Timer.Timer();
     }
 
@@ -24,6 +26,7 @@ class DemoController {
             return;
         }
         _running = true;
+        history.load();
         rangefinder.start(method(:onRange));
         weatherProvider.start(method(:onWeather));
         onTick();
@@ -39,8 +42,7 @@ class DemoController {
 
     function onRange(value as RangeMeasurement) as Void {
         range = value;
-        // Phase 2: snapshot latest weather here, including its own timestamp,
-        // then append one MeasurementRecord per range EVENT, even if equal.
+        history.append(RecordCodec.capture(value, weather, weatherProvider.isConnected()));
         WatchUi.requestUpdate();
     }
 
