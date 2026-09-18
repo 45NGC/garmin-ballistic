@@ -3,6 +3,9 @@ import Toybox.Lang;
 // Sensor measurement. Timestamp is the WATCH reception time (Unix seconds).
 // receivedAtMs is session-only monotonic time; never persist it across launches.
 class RangeMeasurement {
+    function copy() as RangeMeasurement {
+        return new RangeMeasurement(timestamp, receivedAtMs, distance, unit, azimuth, inclination);
+    }
     var timestamp as Number;
     var receivedAtMs as Number;
     var distance as Float;

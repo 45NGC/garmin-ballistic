@@ -26,7 +26,7 @@ class HistoryFixtures {
     function initialize() {}
     function record(at as Number) as MeasurementRecord {
         return RecordCodec.capture(new RangeMeasurement(at, 20000, 428.0, "yd", 275.0, -2.0),
-            new EnvironmentalMeasurement(at - 20, 0, 4.2, 270.0, 14.0, 1009.0, 62.0), false);
+            new EnvironmentalMeasurement(at - 20, 0, 4.2, 270.0, 14.0, 1009.0, 62.0), false, "MockRangefinder", "MockWeather", true);
     }
 }
 
@@ -34,7 +34,7 @@ class HistoryFixtures {
 function historySnapshotsAreIndependent(logger as Test.Logger) as Boolean {
     var range = new RangeMeasurement(100, 20000, 428.0, "yd", 275.0, -2.0);
     var weather = new EnvironmentalMeasurement(80, 0, 4.2, 270.0, 14.0, 1009.0, 62.0);
-    var record = RecordCodec.capture(range, weather, false);
+    var record = RecordCodec.capture(range, weather, false, "MockRangefinder", "MockWeather", true);
     range.distance = 500.0;
     weather.windSpeed = 9.0;
     weather.timestamp = 101;
@@ -61,16 +61,16 @@ function historySnapshotsAreIndependent(logger as Test.Logger) as Boolean {
 (:test)
 function historyMissingAndInvalidFields(logger as Test.Logger) as Boolean {
     var range = new RangeMeasurement(100, 1000, 0.0, "m", null, null);
-    var missing = RecordCodec.capture(range, null, false);
+    var missing = RecordCodec.capture(range, null, false, "MockRangefinder", "MockWeather", true);
     var restored = RecordCodec.decode(missing.toData()) as MeasurementRecord;
     Test.assert(restored.getWeather() == null);
     Test.assert(restored.getAgeSeconds() == null);
     Test.assertEqual(restored.weatherStatus(), "SIN DATOS");
-    var partial = RecordCodec.capture(range, new EnvironmentalMeasurement(99, 500, 0.0, null, null, null, null), true);
+    var partial = RecordCodec.capture(range, new EnvironmentalMeasurement(99, 500, 0.0, null, null, null, null), true, "MockRangefinder", "MockWeather", true);
     Test.assertEqual(0.0, (partial.getWeather() as EnvironmentalMeasurement).windSpeed);
     Test.assert((partial.getWeather() as EnvironmentalMeasurement).temperature == null);
     Test.assert(RecordCodec.decode(partial.toData()) != null);
-    var future = RecordCodec.capture(range, new EnvironmentalMeasurement(101, 2000, null, null, null, null, null), true);
+    var future = RecordCodec.capture(range, new EnvironmentalMeasurement(101, 2000, null, null, null, null, null), true, "MockRangefinder", "MockWeather", true);
     Test.assert(future.getAgeSeconds() == null);
     Test.assertEqual(future.weatherStatus(), "ANTIGUO");
     Test.assert(RecordCodec.decode(future.toData()) != null);
@@ -169,17 +169,24 @@ function historyCorruptionDoesNotGetOverwritten(logger as Test.Logger) as Boolea
 (:test)
 function onlyRangeEventsCreateHistory(logger as Test.Logger) as Boolean {
     var store = new MemoryHistoryStore();
-    var controller = new DemoController(store);
-    controller.onWeather(new EnvironmentalMeasurement(99, 0, 4.2, 270.0, 14.0, 1009.0, 62.0));
-    Test.assertEqual(store.writes, 0);
-    var range = new RangeMeasurement(100, 20000, 428.0, "m", null, null);
-    controller.onRange(range);
-    controller.onWeather(new EnvironmentalMeasurement(101, 21000, 9.0, 280.0, 15.0, 1010.0, 63.0));
-    Test.assertEqual(store.writes, 1);
-    Test.assertEqual(4.2, ((controller.history.get(0) as MeasurementRecord).getWeather() as EnvironmentalMeasurement).windSpeed);
-    controller.onRange(range);
-    Test.assertEqual(store.writes, 2);
-    Test.assertEqual(controller.history.count(), 2);
+    var rangeProvider = new EventRangeProvider();
+    var weatherProvider = new EventWeatherProvider();
+    var controller = new SensorController(rangeProvider, weatherProvider, store, null);
+    controller.start();
+    try {
+        rangeProvider.connect();
+        weatherProvider.connect();
+        weatherProvider.send(new EnvironmentalMeasurement(99, 0, 4.2, 270.0, 14.0, 1009.0, 62.0));
+        Test.assertEqual(store.writes, 0);
+        var range = new RangeMeasurement(100, 20000, 428.0, "m", null, null);
+        rangeProvider.send(range);
+        weatherProvider.send(new EnvironmentalMeasurement(101, 21000, 9.0, 280.0, 15.0, 1010.0, 63.0));
+        Test.assertEqual(store.writes, 1);
+        Test.assertEqual(4.2, ((controller.history.get(0) as MeasurementRecord).getWeather() as EnvironmentalMeasurement).windSpeed);
+        rangeProvider.send(range);
+        Test.assertEqual(store.writes, 2);
+        Test.assertEqual(controller.history.count(), 2);
+    } finally { controller.stop(); }
     return true;
 }
 

@@ -4,9 +4,9 @@ import Toybox.System;
 import Toybox.WatchUi;
 
 class DashboardView extends WatchUi.View {
-    private var _controller as DemoController;
+    private var _controller as SensorController;
 
-    function initialize(controller as DemoController) {
+    function initialize(controller as SensorController) {
         View.initialize();
         _controller = controller;
     }
@@ -23,14 +23,15 @@ class DashboardView extends WatchUi.View {
         var tick = System.getTimer();
         var rangeTick = range == null ? null : range.receivedAtMs;
         var weatherTick = weather == null ? null : weather.receivedAtMs;
-        var rangeStatus = Freshness.status(_controller.rangefinder.isConnected(), rangeTick, tick, AppConfig.RANGE_STALE_MS);
-        var weatherStatus = Freshness.status(_controller.weatherProvider.isConnected(), weatherTick, tick, AppConfig.WEATHER_STALE_MS);
+        var rangeStatus = ProviderState.display(_controller.rangeState, rangeTick, tick, AppConfig.RANGE_STALE_MS);
+        var weatherStatus = ProviderState.display(_controller.weatherState, weatherTick, tick, AppConfig.WEATHER_STALE_MS);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
         // Proportional safe areas accommodate round screens. Fonts are measured
         // against both width and height; no absolute device pixel coordinates.
-        text(dc, w / 2, h * 0.09, _controller.history.hasWarning() ? "DEMO · ERROR REG." : "DEMO · DISTANCIA", w * 0.62, h * 0.07, false);
+        var prefix = _controller.isDemo() ? "DEMO · " : "";
+        text(dc, w / 2, h * 0.09, prefix + (_controller.history.hasWarning() ? "ERROR REG." : "DISTANCIA"), w * 0.62, h * 0.07, false);
         text(dc, w / 2, h * 0.235, DisplayUnits.distance(range, imperial), w * 0.80, h * 0.22, true);
         text(dc, w / 2, h * 0.35, imperial ? "yd" : "m", w * 0.25, h * 0.065, false);
         text(dc, w / 2, h * 0.405, DisplayUnits.time(range) + "  " + rangeStatus, w * 0.88, h * 0.07, false);

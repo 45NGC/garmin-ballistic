@@ -4,15 +4,19 @@ import Toybox.WatchUi;
 
 // Composition root only: acquisition and presentation live in separate modules.
 class SensorViewerApp extends Application.AppBase {
-    private var _controller as DemoController;
+    private var _controller as SensorController;
+    private var _demo as DemoDriver;
 
     function initialize() {
         AppBase.initialize();
-        _controller = new DemoController(null);
+        var rangefinder = new MockRangefinderProvider();
+        var weather = new MockWeatherProvider();
+        _demo = new DemoDriver(rangefinder, weather);
+        _controller = new SensorController(rangefinder, weather, new HistoryStore(), _demo);
     }
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
-        return [new DashboardView(_controller), new DashboardDelegate(_controller)];
+        return [new DashboardView(_controller), new DashboardDelegate(_controller, _demo)];
     }
 
     function onStop(state as Dictionary or Null) as Void {

@@ -6,7 +6,8 @@ module RecordCodec {
     const VERSION = 1;
 
     function capture(range as RangeMeasurement, weather as EnvironmentalMeasurement or Null,
-                     connected as Boolean) as MeasurementRecord {
+                     connected as Boolean, rangeSource as String, weatherSource as String or Null,
+                     simulated as Boolean) as MeasurementRecord {
         var age = null as Number or Null;
         var stale = true;
         if (weather != null) {
@@ -30,9 +31,9 @@ module RecordCodec {
             "environmentalAgeSeconds" => age,
             "environmentalStale" => stale,
             "environmentalConnected" => connected,
-            "rangeSource" => "MockRangefinder",
-            "weatherSource" => weather == null ? null : "MockWeather",
-            "simulated" => true
+            "rangeSource" => rangeSource,
+            "weatherSource" => weather == null ? null : weatherSource,
+            "simulated" => simulated
         } as RecordData);
     }
 

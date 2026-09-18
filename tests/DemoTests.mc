@@ -35,6 +35,7 @@ class DemoProbe {
     var latestRange as RangeMeasurement or Null = null;
 
     function initialize() {}
+    function onState(state as Number, message as String or Null) as Void {}
     function onRange(value as RangeMeasurement) as Void {
         rangeCount += 1;
         latestRange = value;
@@ -49,8 +50,10 @@ function independentSourcesAndLifecycle(logger as Test.Logger) as Boolean {
     var probe = new DemoProbe();
     var rangefinder = new MockRangefinderProvider();
     var weather = new MockWeatherProvider();
-    rangefinder.start(probe.method(:onRange));
-    weather.start(probe.method(:onWeather));
+    rangefinder.start(probe.method(:onRange), probe.method(:onState));
+    weather.start(probe.method(:onWeather), probe.method(:onState));
+    rangefinder.pump(99, -1000, false);
+    weather.pump(99, -1000);
     rangefinder.pump(100, 0, false);
     weather.pump(100, 0);
     Test.assertEqual(probe.rangeCount, 1);
@@ -59,7 +62,7 @@ function independentSourcesAndLifecycle(logger as Test.Logger) as Boolean {
 
     rangefinder.pump(101, 1000, false);
     Test.assertEqual(probe.rangeCount, 1);
-    weather.toggleConnection();
+    weather.setScenario(MockScenario.DISCONNECTED);
     weather.pump(108, 8000);
     rangefinder.pump(108, 8000, false);
     Test.assertEqual(probe.weatherCount, 1);
@@ -71,10 +74,11 @@ function independentSourcesAndLifecycle(logger as Test.Logger) as Boolean {
     rangefinder.stop();
     rangefinder.pump(110, 10000, true);
     Test.assertEqual(probe.rangeCount, 2);
-    rangefinder.start(probe.method(:onRange));
+    rangefinder.start(probe.method(:onRange), probe.method(:onState));
+    rangefinder.pump(110, 10000, true);
     rangefinder.pump(110, 10000, true);
     Test.assertEqual(probe.rangeCount, 3);
-    rangefinder.toggleConnection();
+    rangefinder.setScenario(MockScenario.DISCONNECTED);
     rangefinder.pump(111, 11000, true);
     Test.assertEqual(probe.rangeCount, 3);
     rangefinder.stop();

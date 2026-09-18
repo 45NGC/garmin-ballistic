@@ -3,6 +3,9 @@ import Toybox.Lang;
 // Values supplied by the source. Null means unavailable, never an invented zero.
 // Canonical units: m/s, degrees, Celsius, hPa, percent relative humidity.
 class EnvironmentalMeasurement {
+    function copy() as EnvironmentalMeasurement {
+        return new EnvironmentalMeasurement(timestamp, receivedAtMs, windSpeed, windDirection, temperature, pressure, humidity);
+    }
     var timestamp as Number;
     var receivedAtMs as Number;
     var windSpeed as Float or Null;

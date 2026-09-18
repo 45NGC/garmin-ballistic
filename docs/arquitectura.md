@@ -8,7 +8,7 @@ source/
   ui/                        visor, historial, detalle, confirmación y conversiones
   models/                    RangeMeasurement, EnvironmentalMeasurement,
                              MeasurementRecord y Freshness
-  providers/                 contratos base con callbacks
+  providers/                 contratos base, estados, sesiones y driver opcional
     mock/                    fixtures deterministas
     terrapin/                reservado para Fase 4
     kestrel/                 reservado para Fase 5
@@ -19,10 +19,11 @@ tests/                      pruebas Monkey C de la demo y el historial
 
 `AppBase` construye el controlador. El visor activa/desactiva los mocks al
 mostrarse/ocultarse. Cada proveedor entrega objetos nuevos mediante callbacks;
-solo los mocks utilizan `pump()`, llamado por el temporizador del controlador.
-Los proveedores reales usarán eventos del transporte.
+solo `DemoDriver` utiliza `pump()` sobre los mocks. El controlador llama a un
+`AcquisitionDriver` opcional; sin él, su temporizador solo refresca la antigüedad.
+Los proveedores por eventos no necesitan driver ni son consultados periódicamente.
 
-Un evento de distancia llega a `DemoController.onRange()`, que captura el último
+Un evento de distancia llega a `SensorController.onRange()`, que captura el último
 ambiente con `RecordCodec.capture()` y solicita su persistencia al repositorio.
 No se guarda por redibujado, conversión de unidades ni evento meteorológico.
 Los menús, el historial y sus detalles detienen la adquisición simulada igual
@@ -61,8 +62,9 @@ Formato persistido bajo `measurementHistory`:
 Si falta ambiente, se guarda la distancia con campos meteo `null`. Si está antiguo
 o desconectado, se conserva con su estado. Un salto del reloj de sesión produce
 edad desconocida y marca de antigüedad; cambiar la hora civil no modifica los
-ticks. La versión actual captura procedencias de mocks. Los adaptadores futuros
-deberán aportar identidad, semántica de presión y referencia angular verificadas.
+ticks. La procedencia y marca de simulación vienen de los proveedores inyectados.
+Los adaptadores futuros deberán aportar semántica de presión y referencia
+angular verificadas; actualmente no hay adaptadores físicos.
 
 `RecordCodec.decode()` valida campos obligatorios, tipos, unidad, valores finitos
 y consistencia de ausencia de ambiente. Los límites numéricos amplios no son
@@ -87,8 +89,9 @@ bajo una clave independiente. Referencia oficial:
 2. **Fase 2 implementada:** snapshots de mediciones y ambiente, persistencia de
    últimas 20 mediciones, navegación, detalle, borrado confirmado y errores.
    Compilación genérica verificada; ejecución y validación visual pendientes.
-3. **Fase 3 pendiente:** consolidar contratos, inyección de proveedores y estados
-   de transporte. Retirar dependencias de mocks del controlador de producción.
+3. **Fase 3 implementada:** contratos base por eventos, controlador inyectado,
+   estados de transporte, invalidación de sesiones, validación de muestras,
+   procedencia y escenarios simulados independientes. Ver [contratos](../source/providers/README.md).
 4. **Fase 4 condicionada:** Terrapin real y parser con protocolo accesible.
 5. **Fase 5 condicionada:** Kestrel LiNK real y parser meteorológico autorizado.
 6. **Fase 6 pendiente:** validación exterior, otras resoluciones, reconexión y
@@ -96,3 +99,25 @@ bajo una clave independiente. Referencia oficial:
 
 Todas las fases reciben, presentan y registran sensores; no incluyen cálculos
 balísticos. Investigación y requisitos: [comunicaciones](comunicaciones.md).
+
+## Ciclo de vida en Fase 3
+
+`RangefinderProvider` y `WeatherProvider` heredan de `SensorProvider`, que gestiona
+identidad, estado, suscripción a eventos e identificador de sesión. Los dos
+callbacks son independientes: estado y medición. El controlador guarda solo
+mediciones válidas recibidas mientras está activo y el proveedor está conectado.
+
+Al parar o al pasar a búsqueda, desconexión o error se invalida la sesión
+anterior. Los adaptadores deben conservar el token de cada operación asíncrona
+al iniciarla y pasarlo al entregar datos/estado. Leer el token actual dentro de
+un callback tardío eliminaría esta protección y está prohibido por el contrato.
+
+El controlador inicia cada proveedor por separado; si uno falla, cancela ese
+proveedor y conserva el error visible mientras el otro sigue operativo. No se
+implementa todavía la reconexión automática de radio: el mock permite repetir
+manualmente los escenarios y las Fases 4–6 concretarán transportes y reintentos.
+
+La vista conserva muestras para mostrar su antigüedad, aunque se detenga la
+adquisición. Los modelos entregados por los proveedores y almacenados por el
+controlador son copias; no se mezclan campos entre muestras parciales. Solo se
+utiliza un temporizador en esta composición, detenido al ocultar el visor.
